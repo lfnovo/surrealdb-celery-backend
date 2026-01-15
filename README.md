@@ -207,7 +207,7 @@ Fields:
 
 - Python 3.10+
 - Celery 5.x+
-- SurrealDB 1.x+
+- SurrealDB 2+
 - Message broker (Redis, RabbitMQ, etc.)
 
 ## Architecture
