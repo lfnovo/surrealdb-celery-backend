@@ -1,0 +1,66 @@
+[project]
+name = "surrealdb-celery-backend"
+version = "0.1.0"
+description = "Custom Celery result backend for SurrealDB"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [
+    { name = "Luis Novo", email = "lfnovo@gmail.com" }
+]
+maintainers = [
+    { name = "Luis Novo", email = "lfnovo@gmail.com" }
+]
+keywords = [
+    "celery",
+    "surrealdb",
+    "backend",
+    "result-backend",
+    "distributed-tasks",
+    "task-queue"
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: System :: Distributed Computing",
+    "Framework :: Celery",
+]
+dependencies = [
+    "celery>=5.0.0",
+    "surrealdb>=1.0.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/lfnovo/surrealdb-celery-backend"
+Repository = "https://github.com/lfnovo/surrealdb-celery-backend"
+Issues = "https://github.com/lfnovo/surrealdb-celery-backend/issues"
+Changelog = "https://github.com/lfnovo/surrealdb-celery-backend/releases"
+
+[project.optional-dependencies]
+test = [
+    "pytest>=7.0",
+    "pytest-mock>=3.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["surrealdb_celery_backend"]
+
+[tool.pytest.ini_options]
+markers = [
+    "integration: marks tests as integration tests (require SurrealDB)",
+]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]

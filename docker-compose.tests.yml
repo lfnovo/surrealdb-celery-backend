@@ -1,0 +1,18 @@
+version: '3.8'
+
+# Minimal setup for integration tests
+# Only includes SurrealDB (no Redis needed)
+#
+# Usage: docker-compose -f docker-compose.tests.yml up
+
+services:
+  surrealdb:
+    image: surrealdb/surrealdb:latest
+    command: start --user root --pass root
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5

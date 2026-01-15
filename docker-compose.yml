@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  # SurrealDB - Result backend storage
+  surrealdb:
+    image: surrealdb/surrealdb:latest
+    command: start --user root --pass root
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - celery-network
+
+  # Redis - Message broker (only needed for running examples, not for integration tests)
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - celery-network
+
+networks:
+  celery-network:
+    driver: bridge
