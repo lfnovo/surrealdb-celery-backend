@@ -168,23 +168,35 @@ class TestGetTaskMetaFor:
         assert result['date_done'] == "2026-01-14T12:00:00"
         assert result['task_id'] == "test-task-123"
 
-    def test_get_task_meta_for_returns_none_for_missing_task(self, backend, mock_surreal):
-        """Test that _get_task_meta_for returns None when task not found."""
+    def test_get_task_meta_for_returns_pending_for_missing_task(self, backend, mock_surreal):
+        """Test that _get_task_meta_for returns PENDING state when task not found."""
+        from celery import states
+
         # Mock empty response - SurrealDB returns empty list for missing records
         mock_surreal.query.return_value = []
 
         result = backend._get_task_meta_for('nonexistent-task')
 
-        assert result is None
+        # Should return default PENDING state, not None
+        assert result is not None
+        assert result['status'] == states.PENDING
+        assert result['task_id'] == 'nonexistent-task'
+        assert result['result'] is None
+        assert result['traceback'] is None
 
-    def test_get_task_meta_for_returns_none_for_no_result(self, backend, mock_surreal):
-        """Test that _get_task_meta_for returns None when query returns no result."""
+    def test_get_task_meta_for_returns_pending_for_no_result(self, backend, mock_surreal):
+        """Test that _get_task_meta_for returns PENDING state when query returns None."""
+        from celery import states
+
         # Mock None response
         mock_surreal.query.return_value = None
 
         result = backend._get_task_meta_for('nonexistent-task')
 
-        assert result is None
+        # Should return default PENDING state, not None
+        assert result is not None
+        assert result['status'] == states.PENDING
+        assert result['task_id'] == 'nonexistent-task'
 
 
 class TestForget:
