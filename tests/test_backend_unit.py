@@ -98,12 +98,13 @@ class TestStoreResult:
         # Check parameters
         params = call_args[0][1]
         assert params['task_id'] == 'test-task-123'
+        # Only status, result, and date_done are stored (no redundant task_id/traceback)
         assert params['data']['status'] == 'SUCCESS'
-        assert params['data']['task_id'] == 'test-task-123'
-        # Result field now contains the full encoded metadata
         assert params['data']['result'] == '{"status": "SUCCESS", "result": {"data": "test"}, "task_id": "test-task-123", "traceback": null, "date_done": "2026-01-14T12:00:00"}'
-        assert params['data']['traceback'] is None
         assert params['data']['date_done'] == '2026-01-14T12:00:00'
+        # task_id and traceback should NOT be in data (they're in the serialized result)
+        assert 'task_id' not in params['data']
+        assert 'traceback' not in params['data']
 
     def test_store_result_with_traceback(self, backend, mock_surreal, mocker):
         """Test that _store_result stores traceback when task fails."""
@@ -121,8 +122,11 @@ class TestStoreResult:
 
         call_args = mock_surreal.query.call_args
         params = call_args[0][1]
-        assert params['data']['traceback'] == 'Traceback: test error'
+        # Only status, result, and date_done are stored
         assert params['data']['status'] == 'FAILURE'
+        # Traceback is in the serialized result, not as a separate field
+        assert 'traceback' not in params['data']
+        assert 'Traceback: test error' in params['data']['result']
 
 
 class TestGetTaskMetaFor:

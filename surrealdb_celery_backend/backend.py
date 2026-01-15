@@ -110,12 +110,13 @@ class SurrealDBBackend(BaseBackend):
         if isinstance(encoded_meta, bytes):
             encoded_meta = encoded_meta.decode('utf-8')
 
-        # Store as a single serialized field
+        # Store with minimal redundancy
+        # - status: for efficient filtering in queries
+        # - result: full serialized metadata (source of truth)
+        # - date_done: for cleanup queries
         data = {
-            "task_id": task_id,
             "status": state,
-            "result": encoded_meta,  # This is the full serialized metadata
-            "traceback": traceback,
+            "result": encoded_meta,  # Full serialized metadata
             "date_done": meta['date_done'],
         }
 
