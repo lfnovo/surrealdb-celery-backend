@@ -101,6 +101,20 @@ Configure the backend through your Celery app's configuration:
 | `surrealdb_password` | `root` | Authentication password |
 | `result_expires` | `86400` | Result expiration time (seconds) |
 
+**⚠️ Security Note:** The default credentials (`root/root`) are for **development and testing only**. Always use secure credentials in production:
+
+```python
+import os
+
+app.conf.update(
+    surrealdb_url=os.environ['SURREALDB_URL'],
+    surrealdb_namespace='production',
+    surrealdb_database='celery_results',
+    surrealdb_username=os.environ['SURREALDB_USERNAME'],
+    surrealdb_password=os.environ['SURREALDB_PASSWORD'],
+)
+```
+
 ## Testing
 
 ### Quick Start with Just
