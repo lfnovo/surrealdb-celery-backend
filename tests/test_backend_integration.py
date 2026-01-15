@@ -124,10 +124,17 @@ class TestIntegrationStoreAndRetrieve:
         assert meta['traceback'] == traceback_text
         assert meta['task_id'] == task_id
 
-    def test_get_nonexistent_task_returns_none(self, integration_backend):
-        """Test that retrieving a non-existent task returns None."""
+    def test_get_nonexistent_task_returns_pending(self, integration_backend):
+        """Test that retrieving a non-existent task returns PENDING state."""
+        from celery import states
+
         meta = integration_backend._get_task_meta_for('nonexistent-task-xyz')
-        assert meta is None
+
+        # Should return default PENDING state for non-existent tasks
+        assert meta is not None
+        assert meta['status'] == states.PENDING
+        assert meta['task_id'] == 'nonexistent-task-xyz'
+        assert meta['result'] is None
 
     def test_update_existing_task_result(self, integration_backend):
         """Test updating an existing task result (UPSERT behavior)."""
@@ -179,9 +186,10 @@ class TestIntegrationForget:
         # Forget it
         integration_backend._forget(task_id)
 
-        # Verify it's gone
+        # Verify it's gone - should return PENDING for deleted tasks
+        from celery import states
         meta = integration_backend._get_task_meta_for(task_id)
-        assert meta is None
+        assert meta['status'] == states.PENDING
 
     def test_forget_nonexistent_task_does_not_error(self, integration_backend):
         """Test that forgetting a non-existent task doesn't raise an error."""
@@ -225,9 +233,10 @@ class TestIntegrationCleanup:
         # Run cleanup (expires after 1 day by default)
         integration_backend.cleanup()
 
-        # Old task should be gone
+        # Old task should be gone - returns PENDING for deleted tasks
+        from celery import states
         old_meta = integration_backend._get_task_meta_for(old_task_id)
-        assert old_meta is None
+        assert old_meta['status'] == states.PENDING
 
         # Recent task should still exist
         recent_meta = integration_backend._get_task_meta_for(recent_task_id)
@@ -259,8 +268,10 @@ class TestIntegrationCleanup:
         # Cleanup should remove it
         integration_backend.cleanup()
 
+        # Should return PENDING for deleted tasks
+        from celery import states
         meta = integration_backend._get_task_meta_for(task_id)
-        assert meta is None
+        assert meta['status'] == states.PENDING
 
 
 @pytest.mark.integration

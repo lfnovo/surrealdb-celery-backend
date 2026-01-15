@@ -3,6 +3,7 @@
 import json
 from typing import Any, Dict, Optional
 
+from celery import states
 from celery.backends.base import BaseBackend
 from surrealdb import Surreal
 
@@ -130,14 +131,15 @@ class SurrealDBBackend(BaseBackend):
             }
         )
 
-    def _get_task_meta_for(self, task_id: str) -> Optional[Dict]:
+    def _get_task_meta_for(self, task_id: str) -> Dict:
         """Retrieve task metadata from SurrealDB.
 
         Args:
             task_id: Unique identifier for the task
 
         Returns:
-            Dictionary with task metadata or None if not found.
+            Dictionary with task metadata. Returns default PENDING state
+            if task doesn't exist yet.
             Expected keys: status, result, traceback, date_done, task_id
         """
         self._ensure_connected()
@@ -151,7 +153,15 @@ class SurrealDBBackend(BaseBackend):
         # Check if result exists
         # SurrealDB returns a list - if empty or None, task doesn't exist
         if not result or len(result) == 0:
-            return None
+            # Return default PENDING state for non-existent tasks
+            # This is required by Celery's backend interface
+            return {
+                'status': states.PENDING,
+                'result': None,
+                'traceback': None,
+                'children': None,
+                'task_id': task_id,
+            }
 
         # Extract the record (first item in the list)
         row = result[0]
