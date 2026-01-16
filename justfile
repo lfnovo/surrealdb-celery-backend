@@ -26,13 +26,13 @@ test-coverage:
 
 # Start SurrealDB only (for integration tests)
 db-start:
-    docker-compose -f docker-compose.tests.yml up -d
+    docker compose -f docker-compose.tests.yml up -d
     @echo "Waiting for SurrealDB to be ready..."
     @sleep 2
 
 # Stop SurrealDB
 db-stop:
-    docker-compose -f docker-compose.tests.yml down
+    docker compose -f docker-compose.tests.yml down
 
 # Run integration tests with automatic DB management
 test-integration-auto: db-start
@@ -41,21 +41,21 @@ test-integration-auto: db-start
 
 # Start all services (SurrealDB + Redis for examples)
 services-start:
-    docker-compose up -d
+    docker compose up -d
     @echo "Waiting for services to be ready..."
     @sleep 2
 
 # Stop all services
 services-stop:
-    docker-compose down
+    docker compose down
 
 # View logs from services
 services-logs:
-    docker-compose logs -f
+    docker compose logs -f
 
 # Check service status
 services-status:
-    docker-compose ps
+    docker compose ps
 
 # Build package for PyPI
 build:
@@ -119,6 +119,47 @@ setup: install
     @echo "  2. Run 'just test-integration-auto' to run integration tests"
     @echo "  3. Run 'just services-start' to start services for examples"
     @echo "  4. Run 'just example-worker' to start a Celery worker"
+
+# === E2E Testing ===
+
+# Start e2e test infrastructure (RabbitMQ + SurrealDB)
+e2e-start:
+    docker compose -f docker-compose.e2e.yml up -d
+    @echo "Waiting for services to be ready..."
+    @sleep 5
+    @echo "Services ready! RabbitMQ: localhost:5673, SurrealDB: localhost:8018"
+
+# Stop e2e test infrastructure
+e2e-stop:
+    docker compose -f docker-compose.e2e.yml down
+
+# Show e2e service status
+e2e-status:
+    docker compose -f docker-compose.e2e.yml ps
+
+# Show e2e service logs
+e2e-logs:
+    docker compose -f docker-compose.e2e.yml logs -f
+
+# Start e2e Celery worker (run in separate terminal)
+e2e-worker:
+    @echo "Starting Celery worker for e2e tests..."
+    @echo "Press Ctrl+C to stop"
+    uv run celery -A tests.e2e.celery_app worker --loglevel=info
+
+# Run e2e tests (requires e2e-start and e2e-worker running)
+test-e2e:
+    uv run pytest tests/e2e/ -v -m e2e
+
+# Run e2e tests with output
+test-e2e-verbose:
+    uv run pytest tests/e2e/ -v -m e2e -s
+
+# Clean up e2e environment
+e2e-clean: e2e-stop
+    @echo "E2E environment cleaned up"
+
+# === Publishing ===
 
 # Verify package is ready for publishing
 verify-publish: clean build test

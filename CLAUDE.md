@@ -5,7 +5,7 @@ Custom Celery result backend that stores task results in SurrealDB.
 ## Directory Structure
 
 - **[surrealdb_celery_backend/](surrealdb_celery_backend/CLAUDE.md)**: Core implementation (`SurrealDBBackend` class)
-- **[tests/](tests/CLAUDE.md)**: Unit and integration test suite
+- **[tests/](tests/CLAUDE.md)**: Unit, integration, and e2e test suite
 - **examples/**: Working Celery app demos (not core code)
 - **specs/**: Design documentation
 
@@ -59,6 +59,11 @@ self._client.query("SELECT * FROM type::thing('task', $task_id)", {"task_id": ta
 just test-unit                # Unit tests (no services)
 just test-integration-auto    # Integration tests (auto-starts DB)
 just services-start           # Start SurrealDB + Redis
+
+# E2E tests (require RabbitMQ + SurrealDB + worker)
+just e2e-start                # Start e2e infrastructure
+just e2e-worker               # Start Celery worker (separate terminal)
+just test-e2e                 # Run e2e tests
 ```
 
 ## Critical Gotchas

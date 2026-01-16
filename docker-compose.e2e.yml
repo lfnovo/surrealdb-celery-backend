@@ -1,0 +1,44 @@
+# E2e test infrastructure: RabbitMQ + SurrealDB
+# Uses different ports to avoid conflicts with development services
+#
+# Usage:
+#   docker-compose -f docker-compose.e2e.yml up -d
+#   docker-compose -f docker-compose.e2e.yml down
+
+services:
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq-e2e-test
+    restart: unless-stopped
+    ports:
+      - "5673:5672"    # RabbitMQ AMQP (different from default 5672)
+      - "15673:15672"  # RabbitMQ Management UI
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - e2e-network
+
+  # SurrealDB - commented out, use existing instance on port 8018
+  # surrealdb:
+  #   image: surrealdb/surrealdb:latest
+  #   container_name: surrealdb-e2e-test
+  #   command: start --user root --pass root
+  #   ports:
+  #     - "8018:8000"    # SurrealDB (different from default 8000)
+  #   healthcheck:
+  #     test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
+  #   networks:
+  #     - e2e-network
+
+networks:
+  e2e-network:
+    driver: bridge

@@ -482,26 +482,42 @@ class TestIntegrationChord:
         assert meta is None
 
     def test_on_chord_part_return_tracks_completion(self, integration_backend):
-        """Test that on_chord_part_return tracks task completion."""
-        from unittest.mock import Mock
+        """Test that on_chord_part_return tracks task completion and triggers callback."""
+        from unittest.mock import Mock, patch
+        from celery.result import GroupResult
 
         group_id = 'integration-chord-complete'
 
         # Initialize chord with 2 tasks
         integration_backend.set_chord_size(group_id, 2)
 
-        # Create mock request
+        # Create mock request with chord callback
         mock_request = Mock()
         mock_request.group = group_id
+        mock_request.chord = {'task': 'callback_task', 'args': [], 'kwargs': {}}
 
-        # First task completes
-        integration_backend.on_chord_part_return(mock_request, 'SUCCESS', {'result': 1})
+        # Create a mock GroupResult with working join method
+        mock_deps = Mock(spec=GroupResult)
+        mock_deps.join.return_value = [10, 20]
 
-        meta = integration_backend._get_chord_meta(group_id)
-        assert meta['counter'] == 1
+        # Mock maybe_signature and GroupResult.restore
+        mock_callback = Mock()
+        with patch('surrealdb_celery_backend.backend.maybe_signature', return_value=mock_callback):
+            with patch.object(GroupResult, 'restore', return_value=mock_deps):
+                # First task completes
+                integration_backend.on_chord_part_return(mock_request, 'SUCCESS', {'result': 1})
 
-        # Second task completes - should trigger cleanup
-        integration_backend.on_chord_part_return(mock_request, 'SUCCESS', {'result': 2})
+                meta = integration_backend._get_chord_meta(group_id)
+                assert meta['counter'] == 1
+
+                # Callback should not be called yet
+                mock_callback.delay.assert_not_called()
+
+                # Second task completes - should trigger callback
+                integration_backend.on_chord_part_return(mock_request, 'SUCCESS', {'result': 2})
+
+                # Callback should be called with joined results
+                mock_callback.delay.assert_called_once_with([10, 20])
 
         # Chord should be deleted after completion
         meta = integration_backend._get_chord_meta(group_id)

@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.1] - 2026-01-16
+
+### Added
+
+- **End-to-end test suite**: Comprehensive e2e tests with real RabbitMQ and SurrealDB
+  - 37 e2e tests covering basic tasks, primitives (group/chord/chain), and stress scenarios
+  - Docker Compose infrastructure for e2e testing (`docker-compose.e2e.yml`)
+  - Justfile commands: `e2e-start`, `e2e-stop`, `e2e-worker`, `test-e2e`
+  - Sample Celery tasks for testing (`tests/e2e/tasks.py`)
+- Improved chord integration test to properly verify callback triggering
+
+### Fixed
+
+- Fixed `docker-compose` commands to use `docker compose` (modern Docker CLI)
+- Fixed SurrealDB SDK API usage (removed deprecated `connect()` call)
+
 ## [0.3.0] - 2026-01-15
 
 ### Added
@@ -67,6 +83,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 10 integration tests with real SurrealDB
 - CI/CD with Python 3.10, 3.11, 3.12 support
 
+[0.3.1]: https://github.com/lfnovo/surrealdb-celery-backend/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/lfnovo/surrealdb-celery-backend/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/lfnovo/surrealdb-celery-backend/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/lfnovo/surrealdb-celery-backend/compare/v0.1.0...v0.2.0

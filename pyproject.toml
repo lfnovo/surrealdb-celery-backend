@@ -59,6 +59,7 @@ packages = ["surrealdb_celery_backend"]
 [tool.pytest.ini_options]
 markers = [
     "integration: marks tests as integration tests (require SurrealDB)",
+    "e2e: marks tests as end-to-end tests (require RabbitMQ + SurrealDB + Celery worker)",
 ]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
