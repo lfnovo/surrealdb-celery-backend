@@ -9,12 +9,38 @@ A custom Celery result backend that uses SurrealDB for storing task results, sta
 ## Features
 
 - ✅ Full Celery result backend implementation
+- ✅ Celery primitives support (group, chord, chain)
 - ✅ Secure parameterized queries (prevents injection attacks)
 - ✅ Configurable connection settings
 - ✅ Automatic cleanup of expired results
 - ✅ Support for all task states (SUCCESS, FAILURE, PENDING, etc.)
 - ✅ Comprehensive test coverage (unit + integration tests)
 - ✅ Production-ready with proper error handling
+
+### Celery Primitives Support
+
+| Primitive | Status | Description |
+|-----------|--------|-------------|
+| **Tasks** | ✅ Full | Store/retrieve individual task results |
+| **Groups** | ✅ Full | Parallel task execution with combined results |
+| **Chords** | ✅ Full | Group with callback triggered on completion |
+| **Chains** | ✅ Full | Sequential task execution (native Celery support) |
+
+```python
+from celery import group, chord, chain
+
+# Group - run tasks in parallel
+result = group(add.s(i, i) for i in range(10))().get()
+
+# Chord - group with callback
+result = chord(
+    [add.s(i, i) for i in range(10)],
+    sum_results.s()
+)().get()
+
+# Chain - sequential execution
+result = chain(add.s(2, 2), multiply.s(4), subtract.s(2))().get()
+```
 
 ## Installation
 
@@ -175,15 +201,16 @@ See [examples/README.md](examples/README.md) for detailed usage instructions.
 
 The backend stores task results in SurrealDB using the following structure:
 
-```
-Record ID: task:{task_id}
-Fields:
-  - task_id: Unique task identifier
-  - status: Task state (SUCCESS, FAILURE, etc.)
-  - result: Serialized task result
-  - traceback: Exception traceback (if failed)
-  - date_done: Completion timestamp
-```
+| Table | Record ID | Purpose |
+|-------|-----------|---------|
+| `task` | `task:{task_id}` | Individual task results |
+| `group` | `group:{group_id}` | GroupResult storage for parallel tasks |
+| `chord` | `chord:{group_id}` | Chord completion tracking with atomic counter |
+
+**Task record fields:**
+- `status`: Task state (SUCCESS, FAILURE, etc.)
+- `result`: Serialized task result and metadata
+- `date_done`: Completion timestamp
 
 ### Data Flow
 
