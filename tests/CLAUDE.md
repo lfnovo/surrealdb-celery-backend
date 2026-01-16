@@ -1,12 +1,19 @@
 # Tests
 
-Comprehensive test suite for SurrealDBBackend (35 unit tests + 21 integration tests).
+Comprehensive test suite for SurrealDBBackend (35 unit + 21 integration + e2e tests).
+
+## Structure
+
+- **Unit tests**: `test_backend_unit.py` - 35 tests with mocked SurrealDB
+- **Integration tests**: `test_backend_integration.py` - 21 tests with live SurrealDB
+- **[E2E tests](e2e/CLAUDE.md)**: `e2e/` - Full Celery workflow tests with RabbitMQ + SurrealDB
 
 ## Files
 
 - **`conftest.py`**: Pytest fixtures (`celery_app`, `mock_surreal`, `backend`, `integration_backend`)
 - **`test_backend_unit.py`**: 35 unit tests with mocked SurrealDB client
 - **`test_backend_integration.py`**: 21 integration tests requiring real SurrealDB instance
+- **`e2e/`**: End-to-end tests (see [e2e/CLAUDE.md](e2e/CLAUDE.md))
 
 ## Test Organization
 
@@ -93,9 +100,14 @@ def integration_backend(integration_celery_app, surrealdb_available):
 
 ### Running Tests
 ```bash
-uv run pytest tests/test_backend_unit.py -v           # Unit only
-uv run pytest tests/test_backend_integration.py -v -m integration  # Integration only
-uv run pytest -v                                       # All tests
+just test-unit                # Unit tests (no services needed)
+just test-integration-auto    # Integration tests (auto-starts SurrealDB)
+just test                     # Unit + Integration tests
+
+# E2E tests (require manual setup)
+just e2e-start                # Start RabbitMQ + SurrealDB
+just e2e-worker               # Start Celery worker (separate terminal)
+just test-e2e                 # Run e2e tests
 ```
 
 ### Integration Test Markers
