@@ -61,14 +61,18 @@ def integration_backend(integration_celery_app, surrealdb_available):
     backend._ensure_connected()
     try:
         backend._client.query("DELETE FROM task;")
+        backend._client.query("DELETE FROM group;")
+        backend._client.query("DELETE FROM chord;")
     except Exception:
-        pass  # Table might not exist yet
+        pass  # Tables might not exist yet
 
     yield backend
 
     # Cleanup after test
     try:
         backend._client.query("DELETE FROM task;")
+        backend._client.query("DELETE FROM group;")
+        backend._client.query("DELETE FROM chord;")
     except Exception:
         pass
 
@@ -331,3 +335,236 @@ class TestIntegrationConnectionManagement:
         finally:
             backend._client.query("DELETE FROM task;")
             backend.close()
+
+
+# =============================================================================
+# Group Support Integration Tests
+# =============================================================================
+
+
+@pytest.mark.integration
+class TestIntegrationGroup:
+    """Integration tests for group result storage."""
+
+    def test_save_and_restore_group(self, integration_backend):
+        """Test saving and restoring a group result."""
+        from celery.result import GroupResult, AsyncResult
+
+        group_id = 'integration-group-001'
+
+        # Create a mock GroupResult-like object for testing
+        # We'll use the backend's app to create real results
+        class MockGroupResult:
+            def __init__(self, id, results):
+                self.id = id
+                self.results = results
+                self.parent = None
+
+            def as_tuple(self):
+                return (
+                    (self.id, None),
+                    [(r.id, None) for r in self.results]
+                )
+
+        class MockAsyncResult:
+            def __init__(self, id):
+                self.id = id
+
+        mock_results = [MockAsyncResult('task-1'), MockAsyncResult('task-2')]
+        mock_group = MockGroupResult(group_id, mock_results)
+
+        # Save the group
+        result = integration_backend._save_group(group_id, mock_group)
+        assert result == mock_group
+
+        # Restore the group
+        meta = integration_backend._restore_group(group_id)
+
+        assert meta is not None
+        assert 'result' in meta
+        # The result should be a reconstructed GroupResult
+        restored = meta['result']
+        assert restored is not None
+
+    def test_restore_nonexistent_group_returns_none(self, integration_backend):
+        """Test that restoring a non-existent group returns None."""
+        result = integration_backend._restore_group('nonexistent-group')
+        assert result is None
+
+    def test_delete_group(self, integration_backend):
+        """Test deleting a group result."""
+        group_id = 'integration-group-delete'
+
+        class MockGroupResult:
+            def __init__(self, id):
+                self.id = id
+                self.results = []
+                self.parent = None
+
+            def as_tuple(self):
+                return ((self.id, None), [])
+
+        # Save a group
+        mock_group = MockGroupResult(group_id)
+        integration_backend._save_group(group_id, mock_group)
+
+        # Verify it exists
+        meta = integration_backend._restore_group(group_id)
+        assert meta is not None
+
+        # Delete it
+        integration_backend._delete_group(group_id)
+
+        # Verify it's gone
+        meta = integration_backend._restore_group(group_id)
+        assert meta is None
+
+
+# =============================================================================
+# Chord Support Integration Tests
+# =============================================================================
+
+
+@pytest.mark.integration
+class TestIntegrationChord:
+    """Integration tests for chord synchronization."""
+
+    def test_set_and_get_chord_size(self, integration_backend):
+        """Test setting and retrieving chord size."""
+        group_id = 'integration-chord-001'
+
+        # Set chord size
+        integration_backend.set_chord_size(group_id, 5)
+
+        # Get chord metadata
+        meta = integration_backend._get_chord_meta(group_id)
+
+        assert meta is not None
+        assert meta['chord_size'] == 5
+        assert meta['counter'] == 0
+
+    def test_increment_chord_counter(self, integration_backend):
+        """Test incrementing chord counter."""
+        group_id = 'integration-chord-incr'
+
+        # Initialize chord
+        integration_backend.set_chord_size(group_id, 3)
+
+        # Increment counter
+        result = integration_backend._incr_chord_counter(group_id)
+        assert result['counter'] == 1
+        assert result['chord_size'] == 3
+
+        # Increment again
+        result = integration_backend._incr_chord_counter(group_id)
+        assert result['counter'] == 2
+
+        # And again
+        result = integration_backend._incr_chord_counter(group_id)
+        assert result['counter'] == 3
+
+    def test_delete_chord(self, integration_backend):
+        """Test deleting chord metadata."""
+        group_id = 'integration-chord-delete'
+
+        # Create chord
+        integration_backend.set_chord_size(group_id, 2)
+
+        # Verify it exists
+        meta = integration_backend._get_chord_meta(group_id)
+        assert meta is not None
+
+        # Delete it
+        integration_backend._delete_chord(group_id)
+
+        # Verify it's gone
+        meta = integration_backend._get_chord_meta(group_id)
+        assert meta is None
+
+    def test_on_chord_part_return_tracks_completion(self, integration_backend):
+        """Test that on_chord_part_return tracks task completion."""
+        from unittest.mock import Mock
+
+        group_id = 'integration-chord-complete'
+
+        # Initialize chord with 2 tasks
+        integration_backend.set_chord_size(group_id, 2)
+
+        # Create mock request
+        mock_request = Mock()
+        mock_request.group = group_id
+
+        # First task completes
+        integration_backend.on_chord_part_return(mock_request, 'SUCCESS', {'result': 1})
+
+        meta = integration_backend._get_chord_meta(group_id)
+        assert meta['counter'] == 1
+
+        # Second task completes - should trigger cleanup
+        integration_backend.on_chord_part_return(mock_request, 'SUCCESS', {'result': 2})
+
+        # Chord should be deleted after completion
+        meta = integration_backend._get_chord_meta(group_id)
+        assert meta is None  # Cleaned up after completion
+
+
+# =============================================================================
+# Cleanup Integration Tests for Groups/Chords
+# =============================================================================
+
+
+@pytest.mark.integration
+class TestIntegrationCleanupGroupsChords:
+    """Integration tests for cleanup of expired groups and chords."""
+
+    def test_cleanup_removes_expired_groups(self, integration_backend):
+        """Test that cleanup removes expired group results."""
+        group_id = 'integration-cleanup-group'
+
+        class MockGroupResult:
+            def __init__(self, id):
+                self.id = id
+                self.results = []
+                self.parent = None
+
+            def as_tuple(self):
+                return ((self.id, None), [])
+
+        # Save a group
+        mock_group = MockGroupResult(group_id)
+        integration_backend._save_group(group_id, mock_group)
+
+        # Set date to old
+        old_date = (datetime.now() - timedelta(days=30)).isoformat()
+        integration_backend._client.query(
+            "UPDATE type::thing('group', $group_id) SET date_done = $old_date;",
+            {"group_id": group_id, "old_date": old_date}
+        )
+
+        # Run cleanup
+        integration_backend.cleanup()
+
+        # Group should be gone
+        meta = integration_backend._restore_group(group_id)
+        assert meta is None
+
+    def test_cleanup_removes_expired_chords(self, integration_backend):
+        """Test that cleanup removes expired chord metadata."""
+        group_id = 'integration-cleanup-chord'
+
+        # Create chord
+        integration_backend.set_chord_size(group_id, 5)
+
+        # Set date to old
+        old_date = (datetime.now() - timedelta(days=30)).isoformat()
+        integration_backend._client.query(
+            "UPDATE type::thing('chord', $group_id) SET date_created = $old_date;",
+            {"group_id": group_id, "old_date": old_date}
+        )
+
+        # Run cleanup
+        integration_backend.cleanup()
+
+        # Chord should be gone
+        meta = integration_backend._get_chord_meta(group_id)
+        assert meta is None
