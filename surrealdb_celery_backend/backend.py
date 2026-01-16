@@ -3,9 +3,9 @@
 import json
 from typing import Any, Dict, Optional
 
-from celery import states
+from celery import maybe_signature, states
 from celery.backends.base import BaseBackend
-from celery.result import result_from_tuple
+from celery.result import GroupResult, allow_join_result, result_from_tuple
 from surrealdb import Surreal
 
 
@@ -445,10 +445,15 @@ class SurrealDBBackend(BaseBackend):
             result: Task result
             **kwargs: Additional keyword arguments
         """
+        app = self.app
         # Get the group_id from the request
-        # The group_id is stored in request.group
         group_id = getattr(request, 'group', None)
         if not group_id:
+            return
+
+        # Get the chord callback signature
+        callback = getattr(request, 'chord', None)
+        if not callback:
             return
 
         # Increment counter and get current state
@@ -458,7 +463,37 @@ class SurrealDBBackend(BaseBackend):
 
         # Check if all tasks have completed
         if counter >= chord_size and chord_size > 0:
-            # All tasks done - trigger callback using Celery's mechanism
-            # The callback is handled by Celery's chord implementation
-            # We just need to ensure the group results are available
-            self._delete_chord(group_id)
+            # All tasks done - restore group and trigger callback
+            try:
+                # Restore the group results
+                deps = GroupResult.restore(group_id, backend=self)
+                if deps is None:
+                    # Fallback: try to restore from our _restore_group
+                    group_meta = self._restore_group(group_id)
+                    if group_meta and 'result' in group_meta:
+                        deps = group_meta['result']
+
+                if deps is not None:
+                    # Join results and trigger callback
+                    callback = maybe_signature(callback, app=app)
+                    try:
+                        with allow_join_result():
+                            ret = deps.join(
+                                timeout=app.conf.result_chord_join_timeout,
+                                propagate=True
+                            )
+                    except Exception as exc:
+                        # Handle join failure
+                        self.chord_error_from_stack(
+                            callback,
+                            exc=exc,
+                        )
+                    else:
+                        # Success - apply callback with results
+                        callback.delay(ret)
+            except Exception:
+                # If anything fails, still try to clean up
+                pass
+            finally:
+                # Clean up chord metadata
+                self._delete_chord(group_id)

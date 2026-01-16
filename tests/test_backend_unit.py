@@ -593,9 +593,10 @@ class TestOnChordPartReturn:
 
     def test_on_chord_part_return_increments_counter(self, backend, mock_surreal, mocker):
         """Test that on_chord_part_return increments counter."""
-        # Mock request with group
+        # Mock request with group and chord callback
         mock_request = mocker.Mock()
         mock_request.group = 'chord-123'
+        mock_request.chord = {'task': 'callback_task'}  # Chord callback required
 
         # Mock responses - not yet complete
         mock_surreal.query.side_effect = [
@@ -610,8 +611,20 @@ class TestOnChordPartReturn:
 
     def test_on_chord_part_return_triggers_callback_on_complete(self, backend, mock_surreal, mocker):
         """Test that on_chord_part_return triggers callback when all tasks complete."""
+        from celery.result import GroupResult
+
         mock_request = mocker.Mock()
         mock_request.group = 'chord-123'
+        mock_request.chord = {'task': 'callback_task', 'args': [], 'kwargs': {}}
+
+        # Mock GroupResult.restore to return a mock group
+        mock_deps = mocker.Mock(spec=GroupResult)
+        mock_deps.join.return_value = [1, 2, 3]
+        mocker.patch.object(GroupResult, 'restore', return_value=mock_deps)
+
+        # Mock maybe_signature to return a mock callback
+        mock_callback = mocker.Mock()
+        mocker.patch('surrealdb_celery_backend.backend.maybe_signature', return_value=mock_callback)
 
         # Mock responses - chord complete (counter reaches chord_size)
         mock_surreal.query.side_effect = [
@@ -622,8 +635,9 @@ class TestOnChordPartReturn:
 
         backend.on_chord_part_return(mock_request, 'SUCCESS', {'data': 'test'})
 
+        # Verify callback was triggered with joined results
+        mock_callback.delay.assert_called_once_with([1, 2, 3])
         # Verify DELETE was called (cleanup after completion)
-        assert mock_surreal.query.call_count == 3
         last_call = mock_surreal.query.call_args_list[-1]
         assert "DELETE type::thing('chord', $group_id)" in last_call[0][0]
 
@@ -631,6 +645,17 @@ class TestOnChordPartReturn:
         """Test that on_chord_part_return does nothing without group."""
         mock_request = mocker.Mock()
         mock_request.group = None
+
+        backend.on_chord_part_return(mock_request, 'SUCCESS', {'data': 'test'})
+
+        # No queries should be made
+        mock_surreal.query.assert_not_called()
+
+    def test_on_chord_part_return_skips_without_chord_callback(self, backend, mock_surreal, mocker):
+        """Test that on_chord_part_return does nothing without chord callback."""
+        mock_request = mocker.Mock()
+        mock_request.group = 'chord-123'
+        mock_request.chord = None
 
         backend.on_chord_part_return(mock_request, 'SUCCESS', {'data': 'test'})
 

@@ -52,8 +52,9 @@ Require live SurrealDB. Test classes:
 **Cleanup:**
 - `TestIntegrationCleanupGroupsChords` - Expiration of groups/chords
 
-## Key Fixtures (conftest.py)
+## Key Fixtures
 
+### Unit Test Fixtures (conftest.py)
 ```python
 @pytest.fixture
 def celery_app():
@@ -66,10 +67,26 @@ def mock_surreal(mocker):
 @pytest.fixture
 def backend(celery_app, mock_surreal):
     """SurrealDBBackend with mocked client"""
+```
+
+### Integration Test Fixtures (test_backend_integration.py)
+```python
+@pytest.fixture(scope="module")
+def surrealdb_available():
+    """Check if SurrealDB is available for testing"""
 
 @pytest.fixture
-def integration_backend(celery_app):
-    """Real backend for integration tests (uses SURREALDB_TEST_URL env var)"""
+def integration_celery_app():
+    """Celery app configured for integration tests (uses SURREALDB_TEST_URL env var)"""
+
+@pytest.fixture
+def integration_backend(integration_celery_app, surrealdb_available):
+    """Real backend for integration tests.
+
+    - Skips test if SurrealDB unavailable
+    - Cleans task/group/chord tables before and after each test
+    - Closes connection on teardown
+    """
 ```
 
 ## Patterns

@@ -36,7 +36,7 @@ Extends `celery.backends.base.BaseBackend` with these methods:
 | `_get_chord_meta()` | Retrieves chord metadata (counter, size) |
 | `_incr_chord_counter()` | Atomically increments chord completion counter |
 | `_delete_chord()` | Deletes chord metadata |
-| `on_chord_part_return()` | Called when chord task completes; tracks completion |
+| `on_chord_part_return()` | Tracks completion; triggers callback when all tasks done |
 
 ## Database Tables
 
